@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语学习网站 - 与小动物一起学英语</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5', secondary: '#EC4899', accent: '#10B981',
+                        neutral: '#F3F4F6', 'neutral-dark': '#6B7280',
+                    },
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'pulse-fast': 'pulse 0.5s infinite',
+                        'spin-slow': 'spin 1s linear infinite',
+                    },
+                }
+            }
+        }
+    </script>
+
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+    <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.33.1/distrib/browser/speech-sdk-pronunciation.js"></script>
+
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow { text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+            .animal-card { @apply bg-white rounded-2xl shadow-lg p-4 cursor-pointer transform transition-all hover:scale-105 hover:shadow-xl; }
+            .btn-primary { @apply bg-[#4F46E5] text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all shadow-md; }
+            .btn-secondary { @apply bg-[#EC4899] text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all shadow-md; }
+            .btn-accent { @apply bg-[#10B981] text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all shadow-md; }
+            .btn-letter { @apply w-8 h-8 rounded-full bg-gray-100 hover:bg-[#4F46E5] hover:text-white transition-all text-center text-sm font-medium cursor-pointer; }
+            .input-primary { @apply border-2 border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-[#4F46E5] transition-all; }
+            .card { @apply bg-white rounded-2xl shadow-lg p-6; }
+            .dict-item { @apply p-3 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all; }
+            .set-item { @apply p-2 border rounded mb-1 hover:bg-gray-100 cursor-pointer text-sm; }
+        }
+
+        .recording-wave { display:flex; align-items:center; justify-content:center; gap:4px; height:40px; }
+        .recording-wave span { display:block; width:4px; height:100%; background-color:#EF4444; border-radius:2px; animation:wave 0.8s infinite ease-in-out; }
+        .recording-wave span:nth-child(1){animation-delay:0.0s} .recording-wave span:nth-child(2){animation-delay:0.1s} .recording-wave span:nth-child(3){animation-delay:0.2s} .recording-wave span:nth-child(4){animation-delay:0.3s} .recording-wave span:nth-child(5){animation-delay:0.4s}
+        @keyframes wave { 0%,100%{height:10px} 50%{height:40px} }
+
+        @keyframes fire { 0%,100%{transform:scale(1) translateY(0);} 50%{transform:scale(1.3) translateY(-10px);} }
+        .combo-fire { animation: fire 0.3s ease-in-out infinite; display: inline-block; }
+
+        @keyframes pulse-bg { 0%,100%{box-shadow: 0 0 5px rgba(255,255,255,0.5);} 50%{box-shadow: 0 0 20px rgba(255,255,255,0.9);} }
+        .pulse-block { animation: pulse-bg 0.8s ease-in-out infinite; }
+
+        .confetti { position: fixed; top: -10px; animation: confetti-fall linear forwards; z-index: 9999; pointer-events: none; }
+        @keyframes confetti-fall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+
+        #game-container::-webkit-scrollbar { height: 8px; }
+        #game-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 10px; }
+        #game-container::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 10px; }
+        .dict-container::-webkit-scrollbar { width: 6px; }
+        .dict-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .dict-container::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 10px; }
+
+        .animal-card img { pointer-events:none; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+<div id="app" class="container mx-auto px-4 py-8">
+    <!-- 欢迎屏幕：选择小动物 -->
+    <div id="welcome-screen" class="flex flex-col items-center justify-center min-h-[80vh]">
+        <h1 class="text-5xl md:text-6xl font-bold text-center mb-8 text-[#4F46E5] text-shadow">与小动物一起学英语</h1>
+        <p class="text-xl text-center mb-12 max-w-2xl text-gray-500">选择你喜欢的小动物伙伴，开始你的英语学习之旅吧！</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-5xl">
+            <div class="animal-card" role="button" tabindex="0" data-animal="cat">
+                <img src="https://cdn-icons-png.flaticon.com/512/616/616430.png" alt="小猫语语" class="w-full h-48 object-contain mb-4">
+                <h3 class="text-xl font-bold text-center text-[#4F46E5]">语语</h3>
+                <!-- 已移除：听发音按钮 -->
+            </div>
+            <div class="animal-card" data-animal="dog">
+                <img src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="小狗旺旺" class="w-full h-48 object-contain mb-4">
+                <h3 class="text-xl font-bold text-center text-[#4F46E5]">旺旺</h3>
+                <!-- 已移除：听发音按钮 -->
+            </div>
+            <div class="animal-card" data-animal="rabbit">
+                <img src="https://cdn-icons-png.flaticon.com/512/616/616412.png" alt="小兔跳跳" class="w-full h-48 object-contain mb-4">
+                <h3 class="text-xl font-bold text-center text-[#4F46E5]">跳跳</h3>
+                <!-- 已移除：听发音按钮 -->
+            </div>
+            <div class="animal-card" data-animal="panda">
+                <img src="https://cdn-icons-png.flaticon.com/512/616/616434.png" alt="熊猫盼盼" class="w-full h-48 object-contain mb-4">
+                <h3 class="text-xl font-bold text-center text-[#4F46E5]">盼盼</h3>
+                <!-- 已移除：听发音按钮 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增：功能选择中间页（点击动物后进入） -->
+    <div id="menu-screen" class="hidden flex flex-col items-center justify-center min-h-[80vh]">
+        <button id="menu-back-btn" class="self-start mb-8 text-[#4F46E5] font-semibold"><i class="fa fa-arrow-left mr-2"></i> 返回选择动物</button>
+        <h2 class="text-3xl font-bold text-[#4F46E5] mb-12">请选择学习功能</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-lg">
+            <button class="menu-btn btn-primary py-6 text-xl" data-target="dict-screen">📖 词典</button>
+            <button class="menu-btn btn-accent py-6 text-xl" data-target="practice-screen">🎤 发音练习集</button>
+            <button class="menu-btn btn-secondary py-6 text-xl" data-target="listening-screen">🎮 听力闯关</button>
+            <button class="menu-btn btn-primary py-6 text-xl" data-target="wrong-screen">📝 错题集</button>
+        </div>
+    </div>
+
+    <!-- 页面1：词典页面 -->
+    <div id="dict-screen" class="hidden">
+        <div class="flex justify-between items-center mb-8">
+            <button class="dict-back btn-primary"><i class="fa fa-arrow-left mr-2"></i> 返回功能菜单</button>
+            <h2 class="text-2xl font-bold text-[#4F46E5]">单词词典</h2>
+            <div class="w-20"></div>
+        </div>
+        <!-- 顶部搜索框 -->
+        <input id="dict-search" type="text" class="input-primary w-full mb-6" placeholder="搜索单词...">
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 未学习词集 -->
+            <div class="card">
+                <h3 class="text-lg font-bold mb-3">未学习</h3>
+                <div id="letter-unlearned" class="flex flex-wrap gap-1 mb-3"></div>
+                <div id="list-unlearned" class="h-64 overflow-y-auto dict-container border rounded p-2"></div>
+            </div>
+            <!-- 学习中词集 -->
+            <div class="card">
+                <h3 class="text-lg font-bold mb-3">学习中</h3>
+                <div id="letter-learning" class="flex flex-wrap gap-1 mb-3"></div>
+                <div id="list-learning" class="h-64 overflow-y-auto dict-container border rounded p-2"></div>
+            </div>
+            <!-- 已学习词集 -->
+            <div class="card">
+                <h3 class="text-lg font-bold mb-3">已学习</h3>
+                <div id="letter-learned" class="flex flex-wrap gap-1 mb-3"></div>
+                <div id="list-learned" class="h-64 overflow-y-auto dict-container border rounded p-2"></div>
+            </div>
+        </div>
+
+        <!-- 单词移动弹窗 -->
+        <div id="move-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50">
+            <div class="card w-full max-w-sm">
+                <p class="mb-4">将 <span id="move-word" class="font-bold text-primary"></span> 移动到哪个词集？</p>
+                <div class="flex flex-wrap gap-3 justify-center">
+                    <button class="move-btn btn-primary" data-set="unlearned">未学习</button>
+                    <button class="move-btn btn-accent" data-set="learning">学习中</button>
+                    <button class="move-btn btn-secondary" data-set="learned">已学习</button>
+                    <button id="move-cancel" class="btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页面2：发音练习集页面（保留原功能 + 新增学习中词集） -->
+    <div id="practice-screen" class="hidden">
+        <div class="flex justify-between items-center mb-8">
+            <button class="practice-back btn-primary"><i class="fa fa-arrow-left mr-2"></i> 返回功能菜单</button>
+            <h2 class="text-2xl font-bold text-[#4F46E5]">发音练习集</h2>
+            <div class="w-20"></div>
+        </div>
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 原有发音练习区域（完整保留） -->
+            <div class="lg:w-2/3">
+                <div class="card mb-8">
+                    <div class="mb-4">
+                        <input id="practice-word-input" type="text" class="input-primary w-full" placeholder="当前练习单词（可从学习中词集选择）" readonly>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-4">
+                        <button id="play-standard-pron" class="btn-primary flex items-center"><i class="fa fa-volume-up mr-2"></i> 标准发音</button>
+                        <button id="play-user-pron" class="btn-primary flex items-center"><i class="fa fa-volume-up mr-2"></i> 你的发音</button>
+                        <button id="start-recording" class="btn-secondary flex items-center"><i class="fa fa-microphone mr-2"></i> 开始录音</button>
+                        <button id="stop-recording" class="btn-secondary flex items-center hidden"><i class="fa fa-stop mr-2"></i> 停止录音</button>
+                    </div>
+                    <div id="recording-status" class="mt-4 hidden">
+                        <div class="flex items-center">
+                            <div class="recording-wave mr-3">
+                                <span></span><span></span><span></span><span></span><span></span>
+                            </div>
+                            <span>正在聆听…</span>
+                        </div>
+                    </div>
+                    <div id="pronunciation-result" class="mt-4 hidden">
+                        <h4 class="font-semibold mb-2">发音评分：<span id="pronunciation-score"></span><small id="score-source"></small></h4>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="score-bar" class="bg-[#10B981] h-2.5 rounded-full" style="width:0%"></div>
+                        </div>
+                        <p id="pronunciation-feedback" class="mt-2 text-sm"></p>
+                        <p id="pass-status" class="mt-2 text-lg font-bold"></p>
+                    </div>
+                    <div id="audio-library" class="mt-6 border-t pt-4">
+                        <h4 class="font-semibold text-gray-700 mb-2">🎙️ 我的录音库</h4>
+                        <ul id="audio-library-list" class="space-y-2 max-h-48 overflow-y-auto"></ul>
+                        <p id="no-audio-msg" class="text-sm text-gray-400 mt-2">暂无录音，录制发音后将自动保存到这里。</p>
+                    </div>
+                </div>
+            </div>
+            <!-- 新增：学习中词集 -->
+            <div class="lg:w-1/3">
+                <div class="card h-full">
+                    <h3 class="text-xl font-bold mb-4 text-[#4F46E5]">学习中词集</h3>
+                    <div id="practice-learning-list" class="h-80 overflow-y-auto dict-container border rounded p-2"></div>
+                    <p class="text-sm text-gray-500 mt-4">点击单词自动填入练习框</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页面3：听力闯关页面（独立页面，功能完全保留） -->
+    <div id="listening-screen" class="hidden">
+        <div class="flex justify-between items-center mb-8">
+            <button class="listening-back btn-primary"><i class="fa fa-arrow-left mr-2"></i> 返回功能菜单</button>
+            <h2 class="text-2xl font-bold text-[#4F46E5]">听力闯关</h2>
+            <div class="w-20"></div>
+        </div>
+        <div class="card">
+            <p class="mb-4 text-gray-500">点击下方按钮进入跳一跳闯关游戏！连续答对有惊喜哦~</p>
+            <button id="open-game-btn" class="btn-accent text-xl py-4 px-8 w-full md:w-auto">🎮 开始闯关游戏</button>
+        </div>
+    </div>
+
+    <!-- 页面4：错题集页面（独立页面，功能完全保留） -->
+    <div id="wrong-screen" class="hidden">
+        <div class="flex justify-between items-center mb-8">
+            <button class="wrong-back btn-primary"><i class="fa fa-arrow-left mr-2"></i> 返回功能菜单</button>
+            <h2 class="text-2xl font-bold text-[#EC4899]">错题集</h2>
+            <div class="w-20"></div>
+        </div>
+        <div class="card">
+            <h3 class="text-xl font-bold mb-4 text-[#EC4899]">错题集 <span id="wrong-count"></span></h3>
+            <ul id="wrong-words-list" class="list-disc pl-6 space-y-2"></ul>
+            <button id="clear-wrong-words" class="btn-secondary mt-4">清空错题集</button>
+        </div>
+    </div>
+
+    <!-- 原有动物展示+对话区域（仅辅助） -->
+    <div id="animal-helper" class="hidden fixed bottom-4 left-4 card w-64 z-40">
+        <div id="selected-animal" class="w-32 h-32 mx-auto mb-4 animate-bounce-slow"></div>
+        <div id="animal-speech-bubble" class="text-center" role="status" aria-live="polite">你好！我是你的英语学习伙伴。</div>
+    </div>
+</div>
+
+<!-- 游戏弹窗（完全保留原代码） -->
+<div id="game-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50">
+    <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 p-6 relative overflow-hidden">
+        <button id="close-game-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl z-10">&times;</button>
+        <div id="combo-display" class="absolute top-4 left-4 text-2xl font-bold text-orange-500 hidden">🔥 连击 x<span id="combo-count">0</span></div>
+        <div class="text-center mb-4">
+            <span class="text-3xl font-bold text-[#4F46E5]">第 <span id="game-level">1</span> 关</span>
+            <span class="ml-4 text-red-500">错误 <span id="game-error-count">0</span>/3</span>
+            <span class="ml-4 text-gray-600">进度 <span id="game-progress">1/10</span></span>
+        </div>
+        <div id="game-container" class="relative bg-white/60 rounded-xl p-4 mb-4 shadow-inner overflow-x-auto overflow-y-hidden" style="height:220px;">
+            <div id="game-blocks" class="flex items-end gap-8 h-full" style="min-width:max-content;"></div>
+            <div id="game-character" class="absolute bottom-0 transform -translate-x-1/2 transition-all duration-500 ease-in-out" style="left:30px; font-size:50px; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));">🐱</div>
+        </div>
+        <div class="flex flex-col items-center gap-4">
+            <div class="flex gap-4 w-full justify-center">
+                <button id="play-game-standard" class="btn-primary"><i class="fa fa-volume-up mr-2"></i> 听标准发音</button>
+                <button id="play-game-user" class="btn-primary"><i class="fa fa-volume-up mr-2"></i> 听你的发音</button>
+            </div>
+            <div class="flex gap-4 w-full">
+                <input id="game-input" type="text" class="input-primary flex-grow" placeholder="输入你听到的单词...">
+                <button id="game-submit" class="btn-accent relative overflow-hidden">确认</button>
+            </div>
+            <button id="game-restart" class="btn-secondary hidden">重新开始</button>
+            <p id="game-message" class="font-semibold text-center text-lg"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const AZURE_SPEECH_KEY = "aqYofh05xCJalC3geFaW2WexYBug5BY5u4uAKZNGIwwtyjQfz9WNJQQJ99CEAC3pKaRXJ3w3AAAYACOGpaZW";
+    const AZURE_SPEECH_REGION = "eastasia";
+
+    const animals = {
+        cat: { name: "语语", image: "https://cdn-icons-png.flaticon.com/512/616/616430.png", greetings: ["你好！我是语语！"] },
+        dog: { name: "旺旺", image: "https://cdn-icons-png.flaticon.com/512/616/616408.png", greetings: ["汪汪！我是旺旺！"] },
+        rabbit: { name: "跳跳", image: "https://cdn-icons-png.flaticon.com/512/616/616412.png", greetings: ["大家好！我是跳跳！"] },
+        panda: { name: "盼盼", image: "https://cdn-icons-png.flaticon.com/512/616/616434.png", greetings: ["你好！我是盼盼！"] }
+    };
+
+    const wordDictionary = {
+        "access": "v. 获取 n. 接近，入口","project": "n. 工程；课题、作业","intention": "n. 打算，意图",
+        "equivalence": "n. 等值，相等","negotiate": "v. 谈判，协商，交涉","disappointing": "adj. 令人失望的",
+        "alternative": "n. 代替品","generous": "adj. 慷慨的","administration": "n. 管理；管理部门",
+        "skillful": "adj. 灵巧的，娴熟的","data": "n. 数据；资料","pollution": "n. 污染",
+        "possession": "n. 有，所有；占有物","manly": "adj. 男子气概的，果断的","reverse": "v. 颠倒；翻转 n. 背面",
+        "giant": "adj. 巨大的 n. 巨人，巨物；才智超群的人","arbitrary": "adj. 随心所欲的， 专断的",
+        "fearful": "adj. 害怕的， 可怕的； 不安的， 忧虑的","accent": "n. 口音， 腔调； 重音",
+        "passive": "adj. 被动的， 消极的","fertilizer": "n. 肥料","lorry": "n. 运货汽车， 卡车",
+        "carrier": "n. 运输工具， 运载工具； 带菌者； 载重架， 置物架","fragment": "v. 成碎片 n. 碎片，破片，碎块",
+        "corresponding": "adj. 相应的， 符合的","response": "n. 回答， 答复； 反应， 响应",
+        "treaty": "n. 条约， 协议， 协定","responsive": "adj. 响应的； 敏感的， 易受影响的","ounce": "n. 盎司",
+        "biological": "adj. 生物的","strategy": "n. 策略，战略","paradox": "n. 悖论；自相矛盾",
+        "primary": "adj. 主要的，基本的","standpoint": "n. 立场","grab": "v. 抢先，抢占，抢夺",
+        "crucial": "adj. 至关重要的","flaw": "n. 缺点；错误","depressed": "adj. 萧条的；沮丧的","obstacle": "n. 阻碍"
+    };
+    const englishWords = Object.keys(wordDictionary);
+    const letterList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+    // 三大词集数据
+    let wordSets = {
+        unlearned: [...englishWords],
+        learning: [],
+        learned: []
+    };
+    let currentMoveWord = "";
+    let currentMoveFrom = "";
+
+    let currentState = {
+        selectedAnimal: null,
+        currentWord: null,
+        practiceWord: "",
+        practiceWordMeaning: "",
+        recording: false,
+        azureReady: false,
+        azureRecognizer: null,
+        timeoutId: null,
+        targetWordCache: null,
+        wrongWords: [],
+        gameLevel: 1,
+        userAudioCache: {}
+    };
+
+    let micStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    // 工具函数
+    const shuffle = arr => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+    const getMixedWords = (count, wrongs) => {
+        const revCnt = Math.min(wrongs.length, Math.ceil(count*0.2));
+        const normal = shuffle(englishWords.filter(w=>!wrongs.includes(w))).slice(0,count-revCnt);
+        return shuffle([...normal, ...shuffle(wrongs).slice(0,revCnt)]);
+    };
+    const speak = text => {
+        if(!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const u=new SpeechSynthesisUtterance(text);
+        u.lang='en-US';u.rate=0.9;
+        const setV=()=>{const v=speechSynthesis.getVoices();const e=v.find(x=>x.lang.startsWith('en'));if(e) u.voice=e; speechSynthesis.speak(u);};
+        if(speechSynthesis.getVoices().length) setV(); else speechSynthesis.onvoiceschanged=setV;
+    };
+    const showMsg = msg => document.getElementById('animal-speech-bubble').textContent = msg;
+    let audioCtx;
+    const getCtx = ()=>(audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)());
+    const sfx = type => {
+        try{
+            const c=getCtx(); const o=c.createOscillator(); const g=c.createGain();
+            o.connect(g);g.connect(c.destination);
+            if(type==='correct'){ o.frequency.setValueAtTime(880,c.currentTime); g.gain.setValueAtTime(0.3,c.currentTime); g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+0.15); o.start();o.stop(c.currentTime+0.15); }
+            else if(type==='combo'){ o.frequency.setValueAtTime(1200,c.currentTime); g.gain.setValueAtTime(0.5,c.currentTime); g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+0.1); o.start();o.stop(c.currentTime+0.1); setTimeout(()=>{ const o2=c.createOscillator();o2.frequency.setValueAtTime(1500,c.currentTime);o2.connect(g);o2.start();o2.stop(c.currentTime+0.1); },100); }
+            else { o.type='sawtooth'; o.frequency.setValueAtTime(200,c.currentTime); g.gain.setValueAtTime(0.2,c.currentTime); g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+0.3); o.start();o.stop(c.currentTime+0.3); }
+        }catch(e){}
+    };
+
+    // ========== DOM 元素 ==========
+    const welcome = document.getElementById('welcome-screen');
+    const menuScreen = document.getElementById('menu-screen');
+    const dictScreen = document.getElementById('dict-screen');
+    const practiceScreen = document.getElementById('practice-screen');
+    const listeningScreen = document.getElementById('listening-screen');
+    const wrongScreen = document.getElementById('wrong-screen');
+    const animalHelper = document.getElementById('animal-helper');
+
+    const animalCards = document.querySelectorAll('.animal-card');
+    const menuBackBtn = document.getElementById('menu-back-btn');
+    const menuBtns = document.querySelectorAll('.menu-btn');
+
+    // 词典页DOM
+    const dictSearch = document.getElementById('dict-search');
+    const letterUnlearned = document.getElementById('letter-unlearned');
+    const letterLearning = document.getElementById('letter-learning');
+    const letterLearned = document.getElementById('letter-learned');
+    const listUnlearned = document.getElementById('list-unlearned');
+    const listLearning = document.getElementById('list-learning');
+    const listLearned = document.getElementById('list-learned');
+    const moveModal = document.getElementById('move-modal');
+    const moveWordText = document.getElementById('move-word');
+    const moveCancel = document.getElementById('move-cancel');
+    const moveBtns = document.querySelectorAll('.move-btn');
+
+    // 发音练习DOM
+    const practiceInp = document.getElementById('practice-word-input');
+    const practiceLearningList = document.getElementById('practice-learning-list');
+    const startRec = document.getElementById('start-recording');
+    const stopRec = document.getElementById('stop-recording');
+    const recStatus = document.getElementById('recording-status');
+    const pronResult = document.getElementById('pronunciation-result');
+    const pronScore = document.getElementById('pronunciation-score');
+    const scoreBar = document.getElementById('score-bar');
+    const pronFeed = document.getElementById('pronunciation-feedback');
+    const scoreSrc = document.getElementById('score-source');
+    const passStat = document.getElementById('pass-status');
+    const playStandardPron = document.getElementById('play-standard-pron');
+    const playUserPron = document.getElementById('play-user-pron');
+    const audioLibraryList = document.getElementById('audio-library-list');
+    const noAudioMsg = document.getElementById('no-audio-msg');
+
+    // 听力闯关DOM
+    const openGameBtn = document.getElementById('open-game-btn');
+    const gameModal = document.getElementById('game-modal');
+    const closeGameBtn = document.getElementById('close-game-btn');
+    const gLevel = document.getElementById('game-level');
+    const gErrCnt = document.getElementById('game-error-count');
+    const gProgress = document.getElementById('game-progress');
+    const gBlocks = document.getElementById('game-blocks');
+    const gChar = document.getElementById('game-character');
+    const gInput = document.getElementById('game-input');
+    const gSubmit = document.getElementById('game-submit');
+    const gRestart = document.getElementById('game-restart');
+    const gMsg = document.getElementById('game-message');
+    const comboDisplay = document.getElementById('combo-display');
+    const comboCount = document.getElementById('combo-count');
+    const gameContainer = document.getElementById('game-container');
+    const playGameStandard = document.getElementById('play-game-standard');
+    const playGameUser = document.getElementById('play-game-user');
+
+    // 错题集DOM
+    const wrongList = document.getElementById('wrong-words-list');
+    const wrongCount = document.getElementById('wrong-count');
+    const clearWrongBtn = document.getElementById('clear-wrong-words');
+
+    // 返回按钮
+    document.querySelectorAll('.dict-back,.practice-back,.listening-back,.wrong-back')
+        .forEach(btn => btn.addEventListener('click', ()=>{
+            hideAllScreen();
+            menuScreen.classList.remove('hidden');
+        }));
+
+    // ========== 页面切换控制 ==========
+    function hideAllScreen(){
+        welcome.classList.add('hidden');
+        menuScreen.classList.add('hidden');
+        dictScreen.classList.add('hidden');
+        practiceScreen.classList.add('hidden');
+        listeningScreen.classList.add('hidden');
+        wrongScreen.classList.add('hidden');
+    }
+
+    // 动物卡片点击：进入功能菜单
+    function bindCardClick(card){
+        const type = card.dataset.animal;
+        const clickFunc = ()=>{
+            currentState.selectedAnimal=type;
+            const a=animals[type];
+            document.getElementById('selected-animal').innerHTML=`<img src="${a.image}" alt="${a.name}" class="w-full h-full object-contain">`;
+            showMsg(a.greetings[0]);
+            animalHelper.classList.remove('hidden');
+            hideAllScreen();
+            menuScreen.classList.remove('hidden');
+        }
+        card.onclick = clickFunc;
+        card.addEventListener('keydown',e=>{if(e.key==='Enter') clickFunc()});
+    }
+    animalCards.forEach(bindCardClick);
+
+    // 菜单返回
+    menuBackBtn.addEventListener('click',()=>{
+        hideAllScreen();
+        welcome.classList.remove('hidden');
+    });
+
+    // 功能菜单按钮跳转
+    menuBtns.forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            const target = btn.dataset.target;
+            hideAllScreen();
+            document.getElementById(target).classList.remove('hidden');
+            if(target === "dict-screen") renderAllWordSets();
+            if(target === "practice-screen") renderPracticeLearningWords();
+            if(target === "wrong-screen") updateWrongUI();
+        });
+    });
+
+    // ========== 词典模块：26字母 + 三大词集 + 单词移动 ==========
+    function createLetterBar(container){
+        container.innerHTML = '';
+        letterList.forEach(letter=>{
+            const span = document.createElement('span');
+            span.className = 'btn-letter';
+            span.textContent = letter;
+            span.dataset.letter = letter.toLowerCase();
+            span.onclick = ()=> scrollToLetter(container.parentElement, letter.toLowerCase());
+            container.appendChild(span);
+        });
+    }
+
+    function scrollToLetter(wrap, letter){
+        const items = wrap.querySelectorAll('.set-item');
+        for(let item of items){
+            if(item.dataset.word.startsWith(letter)){
+                item.scrollIntoView({behavior:'smooth', block:'start'});
+                break;
+            }
+        }
+    }
+
+    function renderWordSet(container, setName){
+        container.innerHTML = '';
+        const words = wordSets[setName];
+        words.forEach(word=>{
+            const div = document.createElement('div');
+            div.className = 'set-item';
+            div.dataset.word = word;
+            div.textContent = `${word} ｜ ${wordDictionary[word]}`;
+            div.onclick = ()=> openMoveModal(word, setName);
+            container.appendChild(div);
+        });
+    }
+
+    function renderAllWordSets(){
+        createLetterBar(letterUnlearned);
+        createLetterBar(letterLearning);
+        createLetterBar(letterLearned);
+        renderWordSet(listUnlearned, 'unlearned');
+        renderWordSet(listLearning, 'learning');
+        renderWordSet(listLearned, 'learned');
+    }
+
+    // 打开移动弹窗
+    function openMoveModal(word, fromSet){
+        currentMoveWord = word;
+        currentMoveFrom = fromSet;
+        moveWordText.textContent = word;
+        moveModal.classList.remove('hidden');
+    }
+    // 关闭弹窗
+    moveCancel.addEventListener('click',()=>{
+        moveModal.classList.add('hidden');
+    });
+    // 执行移动
+    moveBtns.forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            const toSet = btn.dataset.set;
+            if(toSet === currentMoveFrom) return;
+            // 移除原集合
+            wordSets[currentMoveFrom] = wordSets[currentMoveFrom].filter(w=>w!==currentMoveWord);
+            // 加入新集合
+            wordSets[toSet].push(currentMoveWord);
+            // 刷新列表
+            renderAllWordSets();
+            // 同步到发音练习集的学习中列表
+            renderPracticeLearningWords();
+            moveModal.classList.add('hidden');
+        });
+    });
+
+    // 词典搜索
+    dictSearch.addEventListener('input',(e)=>{
+        const key = e.target.value.trim().toLowerCase();
+        const filterSet = (arr)=> arr.filter(w=>w.includes(key));
+        wordSets.unlearned = filterSet([...englishWords]).filter(w=>!wordSets.learning.includes(w) && !wordSets.learned.includes(w));
+        renderWordSet(listUnlearned, 'unlearned');
+    });
+
+    // ========== 发音练习集：渲染学习中词集 ==========
+    function renderPracticeLearningWords(){
+        practiceLearningList.innerHTML = '';
+        wordSets.learning.forEach(word=>{
+            const div = document.createElement('div');
+            div.className = 'set-item';
+            div.textContent = word;
+            div.onclick = ()=>{
+                practiceInp.value = word;
+                currentState.practiceWord = word;
+                currentState.practiceWordMeaning = wordDictionary[word];
+                showMsg(`已选择单词：${word}`);
+            };
+            practiceLearningList.appendChild(div);
+        });
+    }
+
+    // ========== 录音、发音、评分（原逻辑完整保留） ==========
+    const getTargetWord = ()=> currentState.practiceWord;
+    const resetPronResult = ()=>{
+        pronResult.classList.add('hidden');
+        pronScore.textContent='';
+        scoreBar.style.width='0%';
+        pronFeed.textContent='';
+        scoreSrc.textContent='';
+        passStat.textContent='';
+    };
+
+    const displayScore = (score, isReal)=>{
+        if (isNaN(score) || score === null || score === undefined || score < 0) score = 0;
+        score = Math.max(0, Math.min(100, score));
+        pronScore.textContent = `${score}%`;
+        scoreBar.style.width = `${score}%`;
+        scoreSrc.textContent = isReal ? '(Azure 真实评分)' : '(模拟评分)';
+
+        if(score >= 80){
+            scoreBar.className='bg-[#10B981] h-2.5 rounded-full';
+            pronFeed.textContent='太棒了！';
+            passStat.textContent='✅ 通过';
+            passStat.className='mt-2 text-lg font-bold text-[#10B981]';
+        } else if(score >= 60){
+            scoreBar.className='bg-yellow-500 h-2.5 rounded-full';
+            pronFeed.textContent='不错，继续练习';
+            passStat.textContent='🔄 请再读一遍';
+            passStat.className='mt-2 text-lg font-bold text-yellow-500';
+        } else {
+            scoreBar.className='bg-red-500 h-2.5 rounded-full';
+            pronFeed.textContent='需要努力';
+            passStat.textContent='🔄 请再读一遍';
+            passStat.className='mt-2 text-lg font-bold text-red-500';
+        }
+        pronResult.classList.remove('hidden');
+    };
+
+    const simScore = w => {
+        const l=w.length;
+        const c=/[^aeiou]{3,}/i.test(w)||l>7;
+        return Math.min(98,Math.max(40,(c?55:70)+Math.floor(Math.random()*30)-10));
+    };
+
+    async function startRecordingProcess() {
+        const word = getTargetWord();
+        if (!word) { showMsg('请先选择练习单词'); return; }
+        if (!micStream) {
+            try {
+                micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (e) {
+                showMsg('无法访问麦克风，请检查权限设置');
+                return;
+            }
+        }
+        resetPronResult();
+        recordedChunks = [];
+        try {
+            mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+        } catch (e) {
+            mediaRecorder = new MediaRecorder(micStream);
+        }
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            if (currentState.userAudioCache[word]) URL.revokeObjectURL(currentState.userAudioCache[word]);
+            currentState.userAudioCache[word] = url;
+            renderAudioLibrary();
+            showMsg(`录音已保存：${word}`);
+        };
+        mediaRecorder.start();
+        startAzureRecognition(word);
+        currentState.recording = true;
+        startRec.classList.add('hidden');
+        stopRec.classList.remove('hidden');
+        recStatus.classList.remove('hidden');
+    }
+
+    function stopRecordingProcess() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        if (currentState.azureRecognizer) {
+            currentState.azureRecognizer.close();
+            currentState.azureRecognizer = null;
+        }
+        clearTimeout(currentState.timeoutId);
+        stopRecUI();
+    }
+
+    function stopRecUI() {
+        currentState.recording = false;
+        startRec.classList.remove('hidden');
+        stopRec.classList.add('hidden');
+        recStatus.classList.add('hidden');
+    }
+
+    function startAzureRecognition(word) {
+        const SpeechSDK = window.SpeechSDK;
+        if (!SpeechSDK || !AZURE_SPEECH_KEY || AZURE_SPEECH_KEY.length < 32) {
+            clearTimeout(currentState.timeoutId);
+            currentState.timeoutId = setTimeout(() => {
+                if (currentState.recording) displayScore(simScore(word), false);
+            }, 2000);
+            return;
+        }
+        const cfg = SpeechSDK.SpeechConfig.fromSubscription(AZURE_SPEECH_KEY, AZURE_SPEECH_REGION);
+        cfg.speechRecognitionLanguage = 'en-US';
+        const audio = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        const pronConfig = new SpeechSDK.PronunciationAssessmentConfig(
+            word,
+            SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+            SpeechSDK.PronunciationAssessmentGranularity.Word,
+            true
+        );
+        const rec = new SpeechSDK.SpeechRecognizer(cfg, audio);
+        pronConfig.applyTo(rec);
+        currentState.azureRecognizer = rec;
+        clearTimeout(currentState.timeoutId);
+        currentState.timeoutId = setTimeout(() => {
+            if (currentState.recording) {
+                stopPronunciation();
+                showMsg('录音超时，已自动停止');
+            }
+        }, 12000);
+
+        rec.recognizeOnceAsync(
+            res => {
+                clearTimeout(currentState.timeoutId);
+                if (currentState.azureRecognizer === rec) currentState.azureRecognizer = null;
+                if (res.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+                    const pronRes = SpeechSDK.PronunciationAssessmentResult.fromResult(res);
+                    const totalScore = pronRes.pronunciationScore;
+                    displayScore(Math.round(totalScore), true);
+                } else if (res.reason === SpeechSDK.ResultReason.NoMatch) {
+                    showMsg('未识别到语音，请继续录音');
+                } else {
+                    showMsg('识别服务异常');
+                }
+                rec.close();
+            },
+            err => {
+                clearTimeout(currentState.timeoutId);
+                if (currentState.azureRecognizer === rec) currentState.azureRecognizer = null;
+                showMsg('识别失败，请重试');
+                rec.close();
+            }
+        );
+    }
+
+    const startPronunciation = () => startRecordingProcess();
+    const stopPronunciation = () => stopRecordingProcess();
+
+    playStandardPron.addEventListener('click', () => {
+        const word = getTargetWord();
+        if(word) speak(word);
+        else showMsg("请先选择练习单词");
+    });
+    playUserPron.addEventListener('click', () => {
+        const word = getTargetWord();
+        if(!word) { showMsg("请先选择练习单词"); return; }
+        const url = currentState.userAudioCache[word];
+        if(url) new Audio(url).play();
+        else showMsg("暂无你的录音，请先录制发音");
+    });
+    practiceInp.addEventListener('input', ()=> {
+        currentState.practiceWord = practiceInp.value.trim();
+    });
+    startRec.addEventListener('click', startPronunciation);
+    stopRec.addEventListener('click', stopPronunciation);
+
+    // 录音库渲染
+    function renderAudioLibrary() {
+        const cache = currentState.userAudioCache;
+        const words = Object.keys(cache);
+        audioLibraryList.innerHTML = '';
+        if (words.length === 0) {
+            noAudioMsg.classList.remove('hidden');
+            return;
+        }
+        noAudioMsg.classList.add('hidden');
+        words.forEach(word => {
+            const li = document.createElement('li');
+            li.className = 'flex items-center justify-between bg-gray-50 rounded-lg p-2';
+            li.innerHTML = `
+                <span class="font-medium">${word}</span>
+                <div class="flex gap-2">
+                    <button class="play-lib text-[#4F46E5] hover:text-[#EC4899]" data-word="${word}"><i class="fa fa-play"></i></button>
+                    <button class="delete-lib text-red-400 hover:text-red-600" data-word="${word}"><i class="fa fa-trash"></i></button>
+                </div>
+            `;
+            audioLibraryList.appendChild(li);
+        });
+        document.querySelectorAll('.play-lib').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const word = e.currentTarget.dataset.word;
+                const url = currentState.userAudioCache[word];
+                if (url) new Audio(url).play();
+            });
+        });
+        document.querySelectorAll('.delete-lib').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const word = e.currentTarget.dataset.word;
+                if (confirm(`确定删除单词 "${word}" 的录音吗？`)) {
+                    const url = currentState.userAudioCache[word];
+                    if (url) URL.revokeObjectURL(url);
+                    delete currentState.userAudioCache[word];
+                    renderAudioLibrary();
+                    showMsg(`已删除 ${word} 的录音`);
+                }
+            });
+        });
+    }
+
+    // ========== 错题集（原逻辑保留） ==========
+    const addWrong = word => {
+        if(!currentState.wrongWords.includes(word)){
+            currentState.wrongWords.push(word);
+            updateWrongUI();
+        }
+    };
+    const updateWrongUI = () => {
+        if(!currentState.wrongWords.length){
+            return;
+        }
+        wrongCount.textContent = `(${currentState.wrongWords.length}个)`;
+        wrongList.innerHTML = currentState.wrongWords.map(w=>{
+            const mean = wordDictionary[w] || "无释义";
+            return `<li class="flex flex-col gap-1 bg-gray-50 rounded-lg p-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-medium">${w}</span>
+                    <button class="play-wrong text-[#10B981]" data-word="${w}"><i class="fa fa-volume-up"></i> 播放发音</button>
+                </div>
+                <span class="text-sm text-gray-500">释义：${mean}</span>
+            </li>`;
+        }).join('');
+        document.querySelectorAll('.play-wrong').forEach(b=>{
+            b.addEventListener('click',()=>speak(b.dataset.word));
+        });
+    };
+    clearWrongBtn.addEventListener('click',()=>{
+        currentState.wrongWords=[];
+        updateWrongUI();
+        showMsg('错题集已清空！');
+    });
+
+    // ========== 听力闯关游戏（原逻辑完全保留） ==========
+    let gameData = { words:[], index:0, correct:0, errors:0, over:false, animating:false, combo:0 };
+    const randomColor = ()=>{
+        const colors = ['#FF6B6B','#4ECDC4','#FFE66D','#1A535C','#FF9F1C','#A29BFE','#FD79A8','#00B894'];
+        return colors[Math.floor(Math.random()*colors.length)];
+    };
+    const scrollToCurrentBlock = ()=>{
+        if(!gameData.words.length || gameData.index >= gameData.words.length) return;
+        const block = gBlocks.children[gameData.index];
+        if(block) block.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    };
+    const renderBlocks = count => {
+        gBlocks.innerHTML = '';
+        for(let i=0;i<count;i++){
+            const b=document.createElement('div');
+            b.className='flex-shrink-0 w-16 h-16 rounded-xl border-2 border-white shadow-md flex items-center justify-center text-white font-bold transition-all duration-300';
+            b.style.backgroundColor = randomColor();
+            b.textContent = i+1;
+            if(i===0) b.classList.add('pulse-block','ring-4','ring-yellow-300');
+            gBlocks.appendChild(b);
+        }
+        gameContainer.scrollLeft = 0;
+    };
+    const updateGameUI = ()=>{
+        gProgress.textContent = `${gameData.index+1
